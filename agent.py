@@ -4,7 +4,7 @@ import os
 import matplotlib.pyplot as plt
 
 class Agent:
-    def __init__(self, algorithm_logic, algorithm_name, algorithm_path, save_frequency):
+    def __init__(self, algorithm_logic, algorithm_name, results_path, save_frequency):
         """
         Wrapper class for the agent that interacts with the environment.
 
@@ -13,18 +13,17 @@ class Agent:
         self.logic = algorithm_logic
 
         self.algorithm_name = algorithm_name
-        self.algorithm_path = algorithm_path
         self.save_frequency = save_frequency
 
         # Folder setup
-        self.main_dir = os.path.join(self.algorithm_path, self.algorithm_name)
+        self.main_dir = os.path.join(results_path, self.algorithm_name)
         self.checkpoint_dir = os.path.join(self.main_dir, "checkpoints")
         self.stats_dir = os.path.join(self.main_dir, "stats")
-        os.makedirs(self.main_dir, exist_ok=True)
+
         os.makedirs(self.checkpoint_dir, exist_ok=True)
         os.makedirs(self.stats_dir, exist_ok=True)
         
-        self.best_path = os.path.join(self.main_dir, "best_model")
+        self.best_path = os.path.join(self.main_dir, "best_parameters")
         self.checkpoint_prefix = os.path.join(self.checkpoint_dir, "checkpoint")
 
         self.best_reward = -float('inf')
@@ -42,8 +41,7 @@ class Agent:
         loss = self.logic.train_step(state, action, reward, next_state, done)
 
         self.total_steps += 1
-        current_step_avg_reward = float(tf.reduce_mean(reward))
-        self.reward_history.append(current_step_avg_reward)
+        self.reward_history.append(float(tf.reduce_mean(reward)))
         self.loss_history.append(float(loss))
 
         if len(self.reward_history) >= 100:
@@ -62,8 +60,7 @@ class Agent:
     
     def save(self, folder_path):
         """
-        Saves weights to the specified folder.
-        folder_path: string path where to save weights
+        Saves parameters to the specified folder.
         """
         if not os.path.exists(folder_path):
             os.makedirs(folder_path)
@@ -71,8 +68,7 @@ class Agent:
 
     def load(self, folder_path, state_shape, train=False):
         """
-        Loads weights from the specified folder.
-        folder_path: string path to weights
+        Loads parameters from the specified folder.
         state_shape: (height, width, channels) e.g., (7, 7, 4)
         train: if True, loads weights for training, else loads only the model weights for inference
         """

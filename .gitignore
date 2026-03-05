@@ -1,3 +1,5 @@
 **pycache**
 
-models
+results/*/checkpoints/*
+results/*/best_parameters/*
+results/*/stats/*
