@@ -26,10 +26,15 @@ class Agent:
         self.best_path = os.path.join(self.main_dir, "best_parameters")
         self.checkpoint_prefix = os.path.join(self.checkpoint_dir, "checkpoint")
 
+        #training history
         self.best_reward = -float('inf')
         self.loss_history = []
         self.reward_history = []
         self.total_steps = 0
+        
+        #evaluation history
+        self.eval_cum_reward_evo = None
+        self.eval_apple_ratio_evo = None
 
     def get_action(self, state, training=True):
         # Always returns action indices for the environment
@@ -74,6 +79,41 @@ class Agent:
         """
         self.logic.load_models(folder_path, state_shape, train)
 
+    def record_eval_data(self, cum_reward_evo, apple_ratio_evo):
+        """
+        cum_reward_evo: A list of cumulative rewards for each step.
+        apple_ratio_evo: A list of apple-to-step ratios for each step.
+        """
+        self.eval_cum_reward_evo = cum_reward_evo
+        self.eval_apple_ratio_evo = apple_ratio_evo
+    
+    def save_evaluation_plots(self):
+        """Generates plots for the last evaluation run."""
+        if self.eval_cum_reward_evo is None:
+            return
+
+        # Plot 1: Cumulative Reward Evolution
+        plt.figure(figsize=(10, 5))
+        plt.plot(self.eval_cum_reward_evo, color='purple', label='Population Avg')
+        plt.title('Evolution of Average Cumulative Reward')
+        plt.xlabel('Step')
+        plt.ylabel('Cumulative Reward')
+        plt.legend()
+        plt.grid(True, alpha=0.3)
+        plt.savefig(os.path.join(self.stats_dir, "eval_cum_reward_evolution.png"))
+        plt.close()
+
+        # Plot 2: Apple Efficiency Evolution
+        plt.figure(figsize=(10, 5))
+        plt.plot(self.eval_apple_ratio_evo, color='green', label='Population Efficiency')
+        plt.title('Evolution of Apple/Step Ratio')
+        plt.xlabel('Step')
+        plt.ylabel('Apples / Steps')
+        plt.legend()
+        plt.grid(True, alpha=0.3)
+        plt.savefig(os.path.join(self.stats_dir, "eval_apple_efficiency_evolution.png"))
+        plt.close()
+
     def save_results_plots(self):
         """Generates and saves two plots: Loss and Reward."""
         # Plot Loss
@@ -94,3 +134,29 @@ class Agent:
         plt.savefig(os.path.join(self.stats_dir, "reward_plot.png"))
         plt.close()
         print(f"Graphics saved in {self.stats_dir}")
+
+    def save_eval_stats_binary(self, cum_reward_evo, apple_ratio_evo, filename="eval_stats"):
+        """
+        Saves the evolution data in format (.npz).
+        """
+        save_path = os.path.join(self.stats_dir, f"{filename}.npz")
+        
+        # Save multiple arrays into one compressed file
+        np.savez_compressed(
+            save_path,
+            cum_reward_evolution=np.array(cum_reward_evo),
+            apple_ratio_evolution=np.array(apple_ratio_evo),
+            metadata={
+                "algorithm": self.algorithm_name,
+                "total_steps": len(cum_reward_evo)
+            }
+        )
+        print(f"Evaluation data saved to: {save_path}")
+
+    def load_eval_stats_binary(self, filename="eval_stats"):
+        """
+        Helper to reload the data later for comparison.
+        """
+        path = os.path.join(self.stats_dir, f"{filename}.npz")
+        data = np.load(path, allow_pickle=True)
+        return data['cum_reward_evolution'], data['apple_ratio_evolution']
