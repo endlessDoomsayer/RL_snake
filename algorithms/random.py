@@ -12,11 +12,14 @@ class SafeRandomLogic:
 
     def get_action(self, state, training=False):
         """
-        Picks a random action, but only from directions that 
-        do not result in hitting a wall or the snake's own body.
+        Picks a random action.
+        Priority:
+        1. Randomly from moves that avoid walls AND body.
+        2. If trapped by body, randomly from moves that hit body but avoid walls.
+        3. If trapped by walls, fallback to default.
         """
         # state shape: (n_boards, size, size, 4)
-        # Channels (from to_state): 0:Empty, 1:Fruit, 2:Body, 3:Head
+        # Channels: 0:Empty, 1:Fruit, 2:Body, 3:Head
         size = state.shape[1]
         final_actions = []
 
@@ -26,12 +29,11 @@ class SafeRandomLogic:
             # 1. Locate the head [row, col]
             head_coords = np.argwhere(board[..., 3] == 1)
             if len(head_coords) == 0:
-                final_actions.append([0]) # Fallback
+                final_actions.append([0]) 
                 continue
                 
             r, c = head_coords[0]
             
-            # 2. Define coordinate changes for each action
             # UP=0 (r+1), RIGHT=1 (c+1), DOWN=2 (r-1), LEFT=3 (c-1)
             moves = {
                 0: (1, 0),  # UP
@@ -40,29 +42,33 @@ class SafeRandomLogic:
                 3: (0, -1)  # LEFT
             }
             
-            safe_moves = []
+            safe_moves = [] # No wall, no body
+            body_moves = [] # No wall, but hits body
             
-            # 3. Evaluate each direction
+            # 2. Evaluate each direction
             for move_idx, (dr, dc) in moves.items():
                 nr, nc = r + dr, c + dc
                 
                 # A. Check for Walls (Indices 0 and size-1 are walls)
+                # If it hits a wall, we ignore this move entirely (Terminal)
                 if nr <= 0 or nr >= size - 1 or nc <= 0 or nc >= size - 1:
                     continue
                 
-                # B. Check for Body (Channel 2 in state representation)
+                # B. Check for Body (Channel 2)
                 if board[nr, nc, 2] == 1:
-                    continue
-                
-                # If it passed both checks, it is a safe move
-                safe_moves.append(move_idx)
+                    body_moves.append(move_idx)
+                else:
+                    safe_moves.append(move_idx)
             
-            # 4. Pick randomly from the safe options
+            # 3. Pick the action based on priority
             if safe_moves:
+                # Best case: random safe move
                 action = np.random.choice(safe_moves)
+            elif body_moves:
+                # Second best: eat himself to stay in the game
+                action = np.random.choice(body_moves)
             else:
-                # If no safe moves exist (snake is trapped), 
-                # pick a move to just end the episode
+                # Worst case: trapped by walls, pick UP and die
                 action = 0 
                 
             final_actions.append([action])
