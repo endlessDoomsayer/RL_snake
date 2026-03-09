@@ -42,27 +42,34 @@ class Agent:
         return self.logic.get_action(state, training)
 
     def train_step(self, state, action, reward, next_state, done):
-        # Delegates the specific math to the logic class
+        """
+        Performs the math but DOES NOT update history.
+        Returns: (loss, batch_mean_reward)
+        """
         loss = self.logic.train_step(state, action, reward, next_state, done)
+        batch_mean_reward = float(tf.reduce_mean(reward))
+        return float(loss), batch_mean_reward
+    
+    def record_training_iteration(self, avg_loss, avg_reward):
+        """
+        Appends the pre-averaged stats to history and handles saving.
+        """
+        self.total_steps += 1 # We count iterations as "steps" now
+        self.loss_history.append(avg_loss)
+        self.reward_history.append(avg_reward)
 
-        self.total_steps += 1
-        self.reward_history.append(float(tf.reduce_mean(reward)))
-        self.loss_history.append(float(loss))
-
+        # Handle Best Model Saving (using the averaged iteration reward)
         if len(self.reward_history) >= 100:
             moving_avg_reward = np.mean(self.reward_history[-100:])
-            
             if moving_avg_reward > self.best_reward:
                 self.best_reward = moving_avg_reward
-                self.save(self.best_path) # Save to main folder
+                self.save(self.best_path)
         
         # Periodic Checkpoint
         if self.total_steps % self.save_frequency == 0:
             path = f"{self.checkpoint_prefix}_step_{self.total_steps}"
-            self.save(path) # Save to checkpoints folder
-            
-        return loss
-    
+            self.save(path)
+
     def save(self, folder_path):
         """
         Saves parameters to the specified folder.
@@ -87,6 +94,24 @@ class Agent:
         self.eval_cum_reward_evo = cum_reward_evo
         self.eval_apple_ratio_evo = apple_ratio_evo
     
+    def save_eval_stats_binary(self, cum_reward_evo, apple_ratio_evo, filename="eval_stats"):
+        """
+        Saves the evolution data in format (.npz).
+        """
+        save_path = os.path.join(self.stats_dir, f"{filename}.npz")
+        
+        # Save multiple arrays into one compressed file
+        np.savez_compressed(
+            save_path,
+            cum_reward_evolution=np.array(cum_reward_evo),
+            apple_ratio_evolution=np.array(apple_ratio_evo),
+            metadata={
+                "algorithm": self.algorithm_name,
+                "total_steps": len(cum_reward_evo)
+            }
+        )
+        print(f"Evaluation data saved to: {save_path}")
+
     def save_evaluation_plots(self):
         """Generates plots for the last evaluation run."""
         if self.eval_cum_reward_evo is None:
@@ -114,44 +139,36 @@ class Agent:
         plt.savefig(os.path.join(self.stats_dir, "eval_apple_efficiency_evolution.png"))
         plt.close()
 
-    def save_results_plots(self):
-        """Generates and saves two plots: Loss and Reward."""
-        # Plot Loss
-        plt.figure(figsize=(10, 5))
-        plt.plot(self.loss_history, label='Loss', color='red')
-        plt.title(f'Training Loss - {self.total_steps} iterations')
-        plt.xlabel('Iteration')
-        plt.ylabel('Loss')
-        plt.savefig(os.path.join(self.stats_dir, "loss_plot.png"))
-        plt.close()
-
-        # Plot Reward (using a moving average to make it readable)
-        plt.figure(figsize=(10, 5))
-        plt.plot(self.reward_history, label='Reward', color='blue')
-        plt.title(f'Training Reward - {self.total_steps} iterations')
-        plt.xlabel('Iteration')
-        plt.ylabel('Avg Reward')
-        plt.savefig(os.path.join(self.stats_dir, "reward_plot.png"))
-        plt.close()
-        print(f"Graphics saved in {self.stats_dir}")
-
-    def save_eval_stats_binary(self, cum_reward_evo, apple_ratio_evo, filename="eval_stats"):
-        """
-        Saves the evolution data in format (.npz).
-        """
-        save_path = os.path.join(self.stats_dir, f"{filename}.npz")
-        
-        # Save multiple arrays into one compressed file
+    def save_training_stats_binary(self):
+        """Saves numerical training history to an .npz file."""
+        save_path = os.path.join(self.stats_dir, "training_stats.npz")
         np.savez_compressed(
             save_path,
-            cum_reward_evolution=np.array(cum_reward_evo),
-            apple_ratio_evolution=np.array(apple_ratio_evo),
-            metadata={
-                "algorithm": self.algorithm_name,
-                "total_steps": len(cum_reward_evo)
-            }
+            loss_history=np.array(self.loss_history),
+            reward_history=np.array(self.reward_history),
+            total_steps=self.total_steps
         )
-        print(f"Evaluation data saved to: {save_path}")
+        print(f"Training stats saved to {save_path}")
+
+    def save_training_plots(self):
+        window = 100
+        def moving_average(data, window_size):
+            if len(data) < window_size: return data
+            return np.convolve(data, np.ones(window_size)/window_size, mode='valid')
+
+        # Loss Plot
+        plt.figure(figsize=(12, 6))
+        plt.plot(self.loss_history, color='red', alpha=0.3, label='Loss')
+        plt.plot(range(window-1, len(self.loss_history)), moving_average(self.loss_history, window), color='red', label='Trend')
+        plt.title('Training Loss (Averaged over Epochs per Iteration)')
+        plt.legend(); plt.savefig(os.path.join(self.stats_dir, "loss_plot.png")); plt.close()
+
+        # Reward Plot
+        plt.figure(figsize=(12, 6))
+        plt.plot(self.reward_history, color='blue', alpha=0.3, label='Reward')
+        plt.plot(range(window-1, len(self.reward_history)), moving_average(self.reward_history, window), color='blue', label='Trend')
+        plt.title('Training Reward (Averaged over Epochs per Iteration)')
+        plt.legend(); plt.savefig(os.path.join(self.stats_dir, "reward_plot.png")); plt.close()
 
     def load_eval_stats_binary(self, filename="eval_stats"):
         """
