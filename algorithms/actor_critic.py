@@ -2,7 +2,7 @@ import os
 
 import tensorflow as tf
 from baselogic import BaseLogic
-from genericmodel import GenericNetwork
+from models.genericmodel import GenericNetwork
 
 def create_logic(state_shape, action_dim, n_boards, optimizer, gamma=0.9):
     actor_model = GenericNetwork(action_dim)

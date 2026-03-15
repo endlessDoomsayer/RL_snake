@@ -3,7 +3,7 @@ import numpy as np
 import random
 import os
 from baselogic import BaseLogic
-import genericmodel as gm
+import models.genericmodel as gm
 
 def create_logic(state_shape, action_dim, n_boards, optimizer, gamma=0.9):
     target_model = gm.GenericNetwork(action_dim)
