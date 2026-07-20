@@ -1,7 +1,6 @@
 import tensorflow as tf
 import numpy as np
 
-
 HEAD = 4
 BODY = 3
 FRUIT = 2
@@ -9,7 +8,7 @@ EMPTY = 1
 WALL = 0
 
 
-def create_logic(state_shape, action_dim, n_boards, optimizer=None, gamma=0.9):
+def create_logic(n_boards):
     return GreedyLogic(n_boards)
 
 
@@ -18,10 +17,7 @@ class GreedyLogic:
     def __init__(self, n_boards):
         self.n_boards = n_boards
 
-    def get_action(self, state, training=False):
-        # state: (n_boards, size, size, 4)
-        # Channels: 0:Empty, 1:Fruit, 2:Body, 3:Head
-        
+    def get_action(self, state, training=False):        
         actions = []
         size = state.shape[1]
         
@@ -46,23 +42,22 @@ class GreedyLogic:
             for m_idx, (dr, dc) in moves.items():
                 nr, nc = hr + dr, hc + dc
                 
-                # 1. Strict Wall Check (Terminal)
+                # Strict Wall Check (Terminal)
                 # Never move into index 0 or size-1
                 if nr <= 0 or nr >= size - 1 or nc <= 0 or nc >= size - 1:
                     continue
                 
-                # 2. Body Check
+                # Body Check
                 if board[nr, nc, 2] == 1:
                     body_moves.append(m_idx)
                 else:
                     safe_moves.append(m_idx)
 
             # --- DECISION LOGIC ---
-            
             selected_move = 0
             best_dist = float('inf')
 
-            # Preference 1: Move to an empty cell or fruit
+            # Preference 1: Move to an empty cell or fruit that is closest to the fruit
             if safe_moves:
                 for m_idx in safe_moves:
                     dr, dc = moves[m_idx]
@@ -80,7 +75,7 @@ class GreedyLogic:
                         best_dist = dist
                         selected_move = m_idx
             
-            # Preference 3: Truly trapped by walls (unlikely), go UP
+            # Preference 3: Truly trapped by walls, go UP
             else:
                 selected_move = 0
             

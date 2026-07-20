@@ -1,9 +1,7 @@
-
 import tensorflow as tf
 import numpy as np
 
-
-def create_logic(state_shape, action_dim, n_boards, optimizer, gamma=0.9):
+def create_logic(n_boards):
     return SafeRandomLogic(n_boards)
 
 class SafeRandomLogic:
@@ -18,15 +16,13 @@ class SafeRandomLogic:
         2. If trapped by body, randomly from moves that hit body but avoid walls.
         3. If trapped by walls, fallback to default.
         """
-        # state shape: (n_boards, size, size, 4)
-        # Channels: 0:Empty, 1:Fruit, 2:Body, 3:Head
         size = state.shape[1]
         final_actions = []
 
         for b in range(self.n_boards):
             board = state[b]
             
-            # 1. Locate the head [row, col]
+            # Locate the head [row, col]
             head_coords = np.argwhere(board[..., 3] == 1)
             if len(head_coords) == 0:
                 final_actions.append([0]) 
@@ -45,22 +41,22 @@ class SafeRandomLogic:
             safe_moves = [] # No wall, no body
             body_moves = [] # No wall, but hits body
             
-            # 2. Evaluate each direction
+            # Evaluate each direction
             for move_idx, (dr, dc) in moves.items():
                 nr, nc = r + dr, c + dc
                 
-                # A. Check for Walls (Indices 0 and size-1 are walls)
+                # Check for Walls (Indices 0 and size-1 are walls)
                 # If it hits a wall, we ignore this move entirely (Terminal)
                 if nr <= 0 or nr >= size - 1 or nc <= 0 or nc >= size - 1:
                     continue
                 
-                # B. Check for Body (Channel 2)
+                # Check for Body (Channel 2)
                 if board[nr, nc, 2] == 1:
                     body_moves.append(move_idx)
                 else:
                     safe_moves.append(move_idx)
             
-            # 3. Pick the action based on priority
+            # Pick the action based on priority
             if safe_moves:
                 # Best case: random safe move
                 action = np.random.choice(safe_moves)
