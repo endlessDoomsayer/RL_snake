@@ -9,3 +9,9 @@ python -m pip install --upgrade pip
 
 # 4. Install the python modules from requirement file
 pip install -r requirements.txt
+
+# 5. Reproduce training
+python train.py
+
+# 6. Reproduce evaluation
+python evaluate.py
