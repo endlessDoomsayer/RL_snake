@@ -119,7 +119,7 @@ class BaseEnvironment:
             np.union1d(np.union1d(boards_where_fruits_is_been_eaten, boards_where_bodies_is_been_eaten), hit_wall)
         )] = self.STEP_REWARD
 
-        # (check) add fruit to boards where it's been eaten
+        # add fruit to boards where it's been eaten
         for b in boards_where_fruits_is_been_eaten:
             available = np.argwhere(self.boards[b] == self.EMPTY)
             if len(available) == 0:
@@ -162,3 +162,39 @@ class OriginalSnakeEnvironment(BaseEnvironment):
         ind = available[np.random.choice(range(len(available)))]
         board[ind[0], ind[1]] = self.HEAD
         return board
+
+
+class CustomSnakeEnvironment(OriginalSnakeEnvironment):
+    def __init__(self, n_boards, board_size):
+        super().__init__(n_boards, board_size)
+        
+        self.WIN_REWARD = 1.
+        self.FRUIT_REWARD = .3
+        self.STEP_REWARD = -0.05
+        self.ATE_HIMSELF_REWARD = -.075
+        self.HIT_WALL_REWARD = -.4
+
+        def move(self, actions):
+            '''
+            Rewards change based on the size of the snake:
+            - step rewards is negative and increases for smaller snakes, to encourage them to eat fruits and grow;
+            - ate himself reward is negative and increases based on the number of body pieces eaten, to avoid the snake to eat a great part of its body.
+            
+            '''
+
+            # Body length
+            body_lengths = [len(self.bodies[i]) for i in range(self.n_boards)]
+
+            rewards = super().move(actions)
+
+            body_lengths_after = [len(self.bodies[i]) for i in range(self.n_boards)]
+
+            # Number of body pieces eaten by doing that action
+            body_pieces_eaten = [np.maximum(0, body_lengths[i] - body_lengths_after[i]) for i in range(self.n_boards)]
+
+            rewards[rewards == self.FRUIT_REWARD] = self.FRUIT_REWARD
+            rewards[rewards == self.STEP_REWARD] = self.STEP_REWARD * (1 - np.array(body_lengths) / (self.board_size * self.board_size))
+            rewards[rewards == self.ATE_HIMSELF_REWARD] = self.ATE_HIMSELF_REWARD * np.array(body_pieces_eaten)
+            rewards[rewards == self.HIT_WALL_REWARD] = self.HIT_WALL_REWARD
+            
+            return rewards
